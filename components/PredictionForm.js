@@ -6,7 +6,8 @@ import { crops } from '../data/crops';
 import Card from './Card';
 import ChartCard from './ChartCard';
 import { yieldData, soilData, weatherData } from '../data/mockData';
-// Remove Firebase imports
+import { predictCropYield } from '../utils/mlApi';
+import { getCropAdvice } from '../utils/geminiApi';
 
 const PredictionForm = () => {
   const { theme, language } = useAppContext();
@@ -53,29 +54,50 @@ const PredictionForm = () => {
     setIsLoading(true);
     setPredictionResult(null);
 
-    // Simulate API call to Gemini AI
-    setTimeout(() => {
-      const totalArea = showSubPlots 
-        ? formData.subPlots.reduce((sum, plot) => sum + (parseFloat(plot.area) || 0), 0)
-        : parseFloat(formData.area) || 0;
+    try {
+      // Call ML API for prediction
+      const mlResult = await predictCropYield(formData);
+      
+      if (mlResult.success) {
+        const totalArea = showSubPlots 
+          ? formData.subPlots.reduce((sum, plot) => sum + (parseFloat(plot.area) || 0), 0)
+          : parseFloat(formData.area) || 0;
 
+        // Get AI-powered advice
+        const aiAdvice = await getCropAdvice({
+          ...formData,
+          area: totalArea
+        });
+
+        setPredictionResult({
+          predictedYield: mlResult.data.predictedYield,
+          totalYield: mlResult.data.totalYield,
+          comparativePercentage: mlResult.data.comparativePercentage,
+          confidence: mlResult.data.confidence,
+          totalArea: totalArea,
+          marketPrice: mlResult.data.marketPrice,
+          expectedRevenue: mlResult.data.expectedRevenue,
+          recommendations: mlResult.data.recommendations,
+          advice: {
+            en: aiAdvice.success ? aiAdvice.message : `Based on your ${totalArea} hectares in ${formData.district}, the predicted yield looks good. Consider using certified seeds, maintain proper irrigation schedules, and apply balanced fertilizers.`,
+            hi: aiAdvice.success ? aiAdvice.message : `आपके ${formData.district} में ${totalArea} हेक्टेयर के लिए, अनुमानित उपज अच्छी दिख रही है। प्रमाणित बीजों का उपयोग करें, उचित सिंचाई कार्यक्रम बनाए रखें।`,
+            or: aiAdvice.success ? aiAdvice.message : `ଆପଣଙ୍କ ${formData.district} ରେ ${totalArea} ହେକ୍ଟର ପାଇଁ, ଅନୁମାନିତ ଉତ୍ପାଦନ ଭଲ ଦେଖାଯାଉଛି। ପ୍ରମାଣିତ ମଞ୍ଜି ବ୍ୟବହାର କରନ୍ତୁ।`,
+          },
+          subPlotResults: mlResult.data.subPlotResults || []
+        });
+      } else {
+        throw new Error('ML API call failed');
+      }
+    } catch (error) {
+      console.error('Prediction error:', error);
+      // Show error message to user
       setPredictionResult({
-        predictedYield: (Math.random() * 20 + 25).toFixed(1),
-        comparativePercentage: (Math.random() * 25 + 5).toFixed(1),
-        totalArea: totalArea,
-        advice: {
-          en: `Based on your ${totalArea} hectares in ${formData.district}, the predicted yield looks excellent. Consider using certified seeds, maintain proper irrigation schedules, and apply balanced fertilizers. Monitor for common pests in your region.`,
-          hi: `आपके ${formData.district} में ${totalArea} हेक्टेयर के लिए, अनुमानित उपज उत्कृष्ट दिख रही है। प्रमाणित बीजों का उपयोग करें, उचित सिंचाई कार्यक्रम बनाए रखें और संतुलित उर्वरक लगाएं। अपने क्षेत्र में सामान्य कीटों पर नजर रखें।`,
-          or: `ଆପଣଙ୍କ ${formData.district} ରେ ${totalArea} ହେକ୍ଟର ପାଇଁ, ଅନୁମାନିତ ଉତ୍ପାଦନ ଉତ୍କୃଷ୍ଟ ଦେଖାଯାଉଛି। ପ୍ରମାଣିତ ମଞ୍ଜି ବ୍ୟବହାର କରନ୍ତୁ, ଉପଯୁକ୍ତ ଜଳସେଚନ କାର୍ଯ୍ୟକ୍ରମ ବଜାୟ ରଖନ୍ତୁ ଏବଂ ସନ୍ତୁଳିତ ସାର ପ୍ରୟୋଗ କରନ୍ତୁ। ଆପଣଙ୍କ ଅଞ୍ଚଳରେ ସାଧାରଣ କୀଟପତଙ୍ଗ ଉପରେ ନଜର ରଖନ୍ତୁ।`,
-        },
-        subPlotResults: showSubPlots ? formData.subPlots.map(plot => ({
-          crop: plot.crop,
-          area: plot.area,
-          yield: (Math.random() * 15 + 20).toFixed(1)
-        })) : []
+        error: true,
+        message: 'Unable to get prediction at the moment. Please try again later.'
       });
+    } finally {
       setIsLoading(false);
-    }, 2000);
+    }
   };
 
   const isFormValid = formData.district && formData.season && 
@@ -205,34 +227,90 @@ const PredictionForm = () => {
             {predictionResult && (
               <>
                 <Card title="📈 Prediction Results" className="bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-900 dark:to-blue-900">
+                  {predictionResult.error ? (
+                    <div className="text-center text-red-600 dark:text-red-400">
+                      <p className="text-lg font-semibold">⚠️ Prediction Error</p>
+                      <p className="text-sm mt-2">{predictionResult.message}</p>
+                    </div>
+                  ) : (
                   <div className="text-center space-y-4">
                     <div className="flex items-baseline justify-center">
                       <p className="text-5xl font-bold text-green-600">{predictionResult.predictedYield}</p>
                       <p className="ml-2 text-xl font-bold">{t.yieldUnit}</p>
                     </div>
+                    
+                    {predictionResult.confidence && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        🎯 Confidence: {predictionResult.confidence}%
+                      </p>
+                    )}
+                    
                     <p className="text-lg">
                       📊 {t.comparativeYield}: <span className="text-green-600 font-bold">+{predictionResult.comparativePercentage}%</span> above average
                     </p>
-                    <p className="text-sm opacity-75">Total Area: {predictionResult.totalArea} hectares</p>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="bg-white dark:bg-gray-700 p-3 rounded-lg">
+                        <p className="font-semibold">📐 Total Area</p>
+                        <p>{predictionResult.totalArea} hectares</p>
+                      </div>
+                      <div className="bg-white dark:bg-gray-700 p-3 rounded-lg">
+                        <p className="font-semibold">🌾 Total Yield</p>
+                        <p>{predictionResult.totalYield} quintals</p>
+                      </div>
+                      {predictionResult.marketPrice && (
+                        <>
+                          <div className="bg-white dark:bg-gray-700 p-3 rounded-lg">
+                            <p className="font-semibold">💰 Market Price</p>
+                            <p>₹{predictionResult.marketPrice}/quintal</p>
+                          </div>
+                          <div className="bg-white dark:bg-gray-700 p-3 rounded-lg">
+                            <p className="font-semibold">💵 Expected Revenue</p>
+                            <p>₹{predictionResult.expectedRevenue?.toLocaleString()}</p>
+                          </div>
+                        </>
+                      )}
+                    </div>
                     
                     {predictionResult.subPlotResults.length > 0 && (
                       <div className="mt-4">
                         <h4 className="font-semibold mb-2">Sub-plot Breakdown:</h4>
-                        {predictionResult.subPlotResults.map((result, index) => (
-                          <div key={index} className="flex justify-between text-sm p-2 bg-white dark:bg-gray-700 rounded">
-                            <span>{result.crop}</span>
-                            <span>{result.yield} {t.yieldUnit}</span>
-                          </div>
-                        ))}
+                        <div className="space-y-2">
+                          {predictionResult.subPlotResults.map((result, index) => (
+                            <div key={index} className="flex justify-between text-sm p-2 bg-white dark:bg-gray-700 rounded">
+                              <span>{result.crop} ({result.area} ha)</span>
+                              <span>{result.yieldPerHa} {t.yieldUnit}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
+                  )}
                 </Card>
 
                 <Card title="💡 AI-Powered Advice" className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900 dark:to-orange-900">
-                  <p className="text-sm leading-relaxed">
-                    {predictionResult.advice[language] || predictionResult.advice.en}
-                  </p>
+                  {!predictionResult.error && (
+                    <>
+                      <div className="text-sm leading-relaxed mb-4">
+                        {predictionResult.advice[language] || predictionResult.advice.en}
+                      </div>
+                      
+                      {predictionResult.recommendations && predictionResult.recommendations.length > 0 && (
+                        <div>
+                          <h4 className="font-semibold mb-2">📋 Key Recommendations:</h4>
+                          <ul className="text-sm space-y-1">
+                            {predictionResult.recommendations.map((rec, index) => (
+                              <li key={index} className="flex items-start">
+                                <span className="text-green-600 mr-2">•</span>
+                                <span>{rec}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </Card>
               </>
             )}

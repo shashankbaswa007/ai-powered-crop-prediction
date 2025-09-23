@@ -4,6 +4,8 @@ import { i18n } from '../data/i18n';
 import Card from './Card';
 import ChartCard from './ChartCard';
 import { yieldData, soilData, weatherData } from '../data/mockData';
+import { getWeatherByCity, districtCityMap } from '../utils/weatherApi';
+import { getWeatherBasedAdvice } from '../utils/geminiApi';
 
 const Dashboard = () => {
   const { theme, setView, language, userId, userFarms } = useAppContext();
@@ -14,15 +16,24 @@ const Dashboard = () => {
   const [suggestions, setSuggestions] = useState(null);
 
   useEffect(() => {
-    const fetchDashboardData = () => {
-      // Simulate real-time data fetching
-      setWeather({
-        temperature: 28 + Math.floor(Math.random() * 8),
-        humidity: 60 + Math.floor(Math.random() * 20),
-        wind: 10 + Math.floor(Math.random() * 10),
-        condition: ['Sunny', 'Partly Cloudy', 'Cloudy'][Math.floor(Math.random() * 3)],
-        icon: '🌤️'
-      });
+    const fetchDashboardData = async () => {
+      // Fetch real weather data
+      const defaultDistrict = userFarms.length > 0 ? userFarms[0].district : 'Cuttack';
+      const cityName = districtCityMap[defaultDistrict] || 'Cuttack';
+      
+      const weatherData = await getWeatherByCity(cityName);
+      if (weatherData) {
+        setWeather(weatherData);
+      } else {
+        // Fallback to simulated data
+        setWeather({
+          temperature: 28 + Math.floor(Math.random() * 8),
+          humidity: 60 + Math.floor(Math.random() * 20),
+          wind: 10 + Math.floor(Math.random() * 10),
+          condition: ['Sunny', 'Partly Cloudy', 'Cloudy'][Math.floor(Math.random() * 3)],
+          icon: '🌤️'
+        });
+      }
       
       setSoilHealth({
         ph: (6.5 + Math.random() * 0.8).toFixed(1),
@@ -40,11 +51,7 @@ const Dashboard = () => {
       });
       
       setSuggestions({
-        today: language === 'en' 
-          ? "Monitor soil moisture levels and check for pest infestations. Ideal time for light fertilization."
-          : language === 'hi'
-          ? "मिट्टी की नमी के स्तर की निगरानी करें और कीट संक्रमण की जांच करें। हल्के उर्वरक के लिए आदर्श समय।"
-          : "ମାଟିର ଆର୍ଦ୍ରତା ସ୍ତର ମନିଟର୍ କରନ୍ତୁ ଏବଂ କୀଟ ସଂକ୍ରମଣ ଯାଞ୍ଚ କରନ୍ତୁ। ହାଲୁକା ସାର ପାଇଁ ଉପଯୁକ୍ତ ସମୟ।",
+        today: await generateAISuggestions(weatherData, userFarms[0]),
         tomorrow: language === 'en'
           ? "Prepare for possible rainfall. Ensure proper drainage and consider applying organic compost."
           : language === 'hi'
@@ -54,10 +61,42 @@ const Dashboard = () => {
     };
 
     fetchDashboardData();
-    const interval = setInterval(fetchDashboardData, 30000);
+    const interval = setInterval(fetchDashboardData, 300000); // Update every 5 minutes
     
     return () => clearInterval(interval);
-  }, [language]); // Add language dependency to update suggestions when language changes
+  }, [language, userFarms]); // Add userFarms dependency
+
+  const generateAISuggestions = async (weatherData, farmData) => {
+    if (!weatherData || !farmData) {
+      return language === 'en' 
+        ? "Monitor soil moisture levels and check for pest infestations. Ideal time for light fertilization."
+        : language === 'hi'
+        ? "मिट्टी की नमी के स्तर की निगरानी करें और कीट संक्रमण की जांच करें। हल्के उर्वरक के लिए आदर्श समय।"
+        : "ମାଟିର ଆର୍ଦ୍ରତା ସ୍ତର ମନିଟର୍ କରନ୍ତୁ ଏବଂ କୀଟ ସଂକ୍ରମଣ ଯାଞ୍ଚ କରନ୍ତୁ। ହାଲୁକା ସାର ପାଇଁ ଉପଯୁକ୍ତ ସମୟ।";
+    }
+
+    try {
+      const cropInfo = {
+        district: farmData.district,
+        crop: farmData.subPlots?.[0]?.crop || 'Rice'
+      };
+      
+      const aiAdvice = await getWeatherBasedAdvice(weatherData, cropInfo);
+      
+      if (aiAdvice.success) {
+        return aiAdvice.message.substring(0, 200) + '...'; // Limit length for dashboard
+      }
+    } catch (error) {
+      console.warn('Error getting AI suggestions:', error);
+    }
+
+    // Fallback suggestions
+    return language === 'en' 
+      ? "Monitor soil moisture levels and check for pest infestations. Ideal time for light fertilization."
+      : language === 'hi'
+      ? "मिट्टी की नमी के स्तर की निगरानी करें और कीट संक्रमण की जांच करें। हल्के उर्वरक के लिए आदर्श समय।"
+      : "ମାଟିର ଆର୍ଦ୍ରତା ସ୍ତର ମନିଟର୍ କରନ୍ତୁ ଏବଂ କୀଟ ସଂକ୍ରମଣ ଯାଞ୍ଚ କରନ୍ତୁ। ହାଲୁକା ସାର ପାଇଁ ଉପଯୁକ୍ତ ସମୟ।";
+  };
 
   return (
     <div className={`min-h-screen transition-all duration-300 p-8 pt-20 ${

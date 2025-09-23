@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { i18n } from '../data/i18n';
+import { sendMessageToGemini } from '../utils/geminiApi';
+import { getWeatherByCity, districtCityMap } from '../utils/weatherApi';
 
 const Chatbot = () => {
   const { theme, language } = useAppContext();
@@ -39,46 +41,63 @@ const Chatbot = () => {
     setInputMessage('');
     setIsTyping(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const botResponses = {
-        en: [
-          "Based on current weather patterns, I recommend checking soil moisture levels before irrigation.",
-          "For better yield, consider using organic fertilizers and proper crop rotation techniques.",
-          "Monitor your crops regularly for signs of pests and diseases. Early detection is key!",
-          "The optimal planting time for your region is approaching. Prepare your fields accordingly."
-        ],
-        hi: [
-          "वर्तमान मौसम पैटर्न के आधार पर, मैं सिंचाई से पहले मिट्टी की नमी के स्तर की जांच करने की सलाह देता हूं।",
-          "बेहतर उपज के लिए, जैविक उर्वरकों और उचित फसल चक्र तकनीकों का उपयोग करने पर विचार करें।",
-          "कीटों और बीमारियों के लक्षणों के लिए अपनी फसलों की नियमित निगरानी करें। शीघ्र पता लगाना महत्वपूर्ण है!",
-          "आपके क्षेत्र के लिए इष्टतम रोपण का समय निकट आ रहा है। तदनुसार अपने खेतों को तैयार करें।"
-        ],
-        or: [
-          "ବର୍ତ୍ତମାନର ପାଣିପାଗ ପ୍ୟାଟର୍ନ ଉପରେ ଆଧାର କରି, ଜଳସେଚନ ପୂର୍ବରୁ ମାଟିର ଆର୍ଦ୍ରତା ସ୍ତର ଯାଞ୍ଚ କରିବାକୁ ମୁଁ ପରାମର୍ଶ ଦେଉଛି।",
-          "ଉନ୍ନତ ଉତ୍ପାଦନ ପାଇଁ, ଜୈବିକ ସାର ଏବଂ ଉପଯୁକ୍ତ ଫସଲ ଆବର୍ତ୍ତନ କୌଶଳ ବ୍ୟବହାର କରିବାକୁ ବିଚାର କରନ୍ତୁ।",
-          "କୀଟପତଙ୍ଗ ଏବଂ ରୋଗର ଚିହ୍ନ ପାଇଁ ନିୟମିତ ଭାବରେ ଆପଣଙ୍କ ଫସଲଗୁଡିକ ମନିଟର୍ କରନ୍ତୁ। ପ୍ରାରମ୍ଭିକ ଚିହ୍ନଟ ଗୁରୁତ୍ୱପୂର୍ଣ୍ଣ!",
-          "ଆପଣଙ୍କ ଅଞ୍ଚଳ ପାଇଁ ଅନୁକୂଳ ରୋପଣ ସମୟ ନିକଟତର ହେଉଛି। ତଦନୁସାରେ ଆପଣଙ୍କ କ୍ଷେତ୍ରଗୁଡିକ ପ୍ରସ୍ତୁତ କରନ୍ତୁ।"
-        ]
-      };
-
+    try {
+      // Prepare context for better AI responses
+      const context = await prepareContext();
+      
+      // Send message to Gemini AI
+      const aiResponse = await sendMessageToGemini(inputMessage, context);
+      
       const botMessage = {
         id: messages.length + 2,
-        text: botResponses[language][Math.floor(Math.random() * botResponses[language].length)],
+        text: aiResponse.success ? aiResponse.message : aiResponse.message,
         sender: 'bot',
-        timestamp: new Date()
+        timestamp: new Date(),
+        error: !aiResponse.success
       };
 
       setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Chatbot error:', error);
+      
+      const errorMessage = {
+        id: messages.length + 2,
+        text: "I apologize, but I'm experiencing technical difficulties. Please try again in a moment.",
+        sender: 'bot',
+        timestamp: new Date(),
+        error: true
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
+  };
+
+  const prepareContext = async () => {
+    const context = {
+      language: language,
+      userId: userId
+    };
+
+    // Add weather context if available
+    try {
+      const weatherData = await getWeatherByCity('Cuttack'); // Default city
+      if (weatherData) {
+        context.weather = weatherData;
+      }
+    } catch (error) {
+      console.warn('Could not fetch weather for context:', error);
+    }
+
+    return context;
   };
 
   const quickQuestions = [
-    "Best time to plant rice?",
-    "How to control pests?",
-    "Soil preparation tips",
-    "Water management advice"
+    language === 'en' ? "Best time to plant rice?" : language === 'hi' ? "चावल लगाने का सबसे अच्छा समय?" : "ଚାଉଳ ଲଗାଇବାର ସର୍ବୋତ୍ତମ ସମୟ?",
+    language === 'en' ? "How to control pests?" : language === 'hi' ? "कीटों को कैसे नियंत्रित करें?" : "କୀଟପତଙ୍ଗକୁ କିପରି ନିୟନ୍ତ୍ରଣ କରିବେ?",
+    language === 'en' ? "Soil preparation tips" : language === 'hi' ? "मिट्टी तैयार करने के टिप्स" : "ମାଟି ପ୍ରସ୍ତୁତି ଟିପ୍ସ",
+    language === 'en' ? "Water management advice" : language === 'hi' ? "जल प्रबंधन सलाह" : "ଜଳ ପରିଚାଳନା ପରାମର୍ଶ"
   ];
 
   return (
@@ -110,12 +129,17 @@ const Chatbot = () => {
                 <div className={`max-w-xs lg:max-w-md rounded-2xl p-4 ${
                   message.sender === 'user' 
                     ? 'bg-blue-500 text-white rounded-br-none' 
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-bl-none'
+                    : `${message.error ? 'bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700' : 'bg-gray-100 dark:bg-gray-700'} text-gray-800 dark:text-gray-200 rounded-bl-none`
                 }`}>
                   <p className="text-sm">{message.text}</p>
                   <p className="text-xs opacity-70 mt-1">
                     {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
+                  {message.error && (
+                    <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                      ⚠️ Error occurred
+                    </p>
+                  )}
                 </div>
               </div>
             ))}

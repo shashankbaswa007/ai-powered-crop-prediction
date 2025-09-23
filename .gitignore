@@ -1,4 +1,4 @@
-﻿# dependencies
+# dependencies
 /node_modules
 /.pnp
 .pnp.js
@@ -30,3 +30,4 @@ yarn-error.log*
 
 # vscode
 .vscode
+.env

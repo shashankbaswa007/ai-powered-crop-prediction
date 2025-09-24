@@ -1,95 +1,9 @@
-// utils/weatherApi.js
+// Weather API utility functions using OpenWeather Free APIs
 const OPENWEATHER_API_KEY = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
-const OPENWEATHER_ONECALL_URL = 'https://api.openweathermap.org/data/3.0/onecall';
-const OPENWEATHER_GEOCODING_URL = 'https://api.openweathermap.org/geo/1.0/direct';
+const CURRENT_WEATHER_URL = 'https://api.openweathermap.org/data/2.5/weather';
+const FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast';
 
-export const getWeatherByCoordinates = async (lat, lon) => {
-  if (!OPENWEATHER_API_KEY) {
-    console.error('❌ OpenWeather API key not found. Make sure NEXT_PUBLIC_OPENWEATHER_API_KEY is set.');
-    return null;
-  }
-
-  try {
-    const response = await fetch(
-      `${OPENWEATHER_ONECALL_URL}?lat=${lat}&lon=${lon}&exclude=minutely,alerts&units=metric&appid=${OPENWEATHER_API_KEY}`
-    );
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Weather API error: ${response.status} - ${text}`);
-    }
-
-    const data = await response.json();
-
-    return {
-      current: {
-        temperature: Math.round(data.current.temp),
-        humidity: data.current.humidity,
-        wind: Math.round(data.current.wind_speed * 3.6),
-        condition: data.current.weather[0].main,
-        description: data.current.weather[0].description,
-        icon: getWeatherIcon(data.current.weather[0].main),
-        pressure: data.current.pressure,
-        visibility: data.current.visibility / 1000,
-        uvIndex: data.current.uvi
-      },
-      hourly: data.hourly.slice(0, 24).map(hour => ({
-        time: new Date(hour.dt * 1000),
-        temperature: Math.round(hour.temp),
-        condition: hour.weather[0].main,
-        icon: getWeatherIcon(hour.weather[0].main),
-        humidity: hour.humidity,
-        windSpeed: Math.round(hour.wind_speed * 3.6)
-      })),
-      daily: data.daily.slice(0, 7).map(day => ({
-        date: new Date(day.dt * 1000),
-        tempMax: Math.round(day.temp.max),
-        tempMin: Math.round(day.temp.min),
-        condition: day.weather[0].main,
-        description: day.weather[0].description,
-        icon: getWeatherIcon(day.weather[0].main),
-        humidity: day.humidity,
-        windSpeed: Math.round(day.wind_speed * 3.6),
-        pop: Math.round(day.pop * 100)
-      }))
-    };
-  } catch (error) {
-    console.error('❌ Error fetching weather data:', error.message);
-    return null;
-  }
-};
-
-export const getWeatherByCity = async (cityName) => {
-  if (!OPENWEATHER_API_KEY) return null;
-
-  try {
-    const geoResponse = await fetch(
-      `${OPENWEATHER_GEOCODING_URL}?q=${cityName}&limit=1&appid=${OPENWEATHER_API_KEY}`
-    );
-
-    if (!geoResponse.ok) {
-      const text = await geoResponse.text();
-      throw new Error(`Geocoding API error: ${geoResponse.status} - ${text}`);
-    }
-
-    const geoData = await geoResponse.json();
-    if (geoData.length === 0) throw new Error(`City not found: ${cityName}`);
-
-    const { lat, lon } = geoData[0];
-    const weatherData = await getWeatherByCoordinates(lat, lon);
-
-    if (weatherData) {
-      weatherData.city = cityName;
-      weatherData.coordinates = { lat, lon };
-    }
-
-    return weatherData;
-  } catch (error) {
-    console.error('❌ Error fetching weather data by city:', error.message);
-    return null;
-  }
-};
-
+// Helper to map weather condition to an icon
 const getWeatherIcon = (condition) => {
   const iconMap = {
     'Clear': '☀️',
@@ -105,13 +19,17 @@ const getWeatherIcon = (condition) => {
   return iconMap[condition] || '🌤️';
 };
 
-// Odisha district-to-city mapping
+// District to city mapping for Odisha
+// District to city mapping for all Odisha districts with approximate coordinates
 export const districtCityMap = {
   'Angul': { name: 'Angul', lat: 20.8397, lon: 85.1016 },
   'Balangir': { name: 'Balangir', lat: 20.7081, lon: 83.4847 },
+  'Balasore': { name: 'Balasore', lat: 21.4906, lon: 86.9310 },
+  'Bargarh': { name: 'Bargarh', lat: 21.3333, lon: 83.6167 },
   'Bhadrak': { name: 'Bhadrak', lat: 21.0542, lon: 86.5158 },
   'Boudh': { name: 'Boudh', lat: 20.8356, lon: 84.3258 },
   'Cuttack': { name: 'Cuttack', lat: 20.4625, lon: 85.8828 },
+  'Deogarh': { name: 'Deogarh', lat: 21.4911, lon: 84.4305 },
   'Dhenkanal': { name: 'Dhenkanal', lat: 20.6586, lon: 85.5947 },
   'Gajapati': { name: 'Paralakhemundi', lat: 18.7833, lon: 84.0833 },
   'Ganjam': { name: 'Berhampur', lat: 19.3149, lon: 84.7941 },
@@ -136,11 +54,75 @@ export const districtCityMap = {
   'Sundargarh': { name: 'Rourkela', lat: 22.2604, lon: 84.8536 }
 };
 
+// Fetch current weather by city
+export const getWeatherByCity = async (cityName) => {
+  if (!OPENWEATHER_API_KEY) {
+    console.warn('OpenWeather API key not found');
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      `${CURRENT_WEATHER_URL}?q=${cityName}&appid=${OPENWEATHER_API_KEY}&units=metric`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Weather API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      city: data.name,
+      temperature: Math.round(data.main.temp),
+      humidity: data.main.humidity,
+      wind: Math.round(data.wind.speed * 3.6), // m/s to km/h
+      condition: data.weather[0].main,
+      description: data.weather[0].description,
+      icon: getWeatherIcon(data.weather[0].main)),
+      pressure: data.main.pressure,
+      visibility: data.visibility / 1000 // km
+    };
+  } catch (error) {
+    console.error('Error fetching weather data:', error);
+    return null;
+  }
+};
+
+// Fetch weather by district
 export const getWeatherByDistrict = async (district) => {
   const districtInfo = districtCityMap[district];
   if (!districtInfo) {
     console.warn(`District not found: ${district}`);
     return null;
   }
-  return await getWeatherByCoordinates(districtInfo.lat, districtInfo.lon);
+  return await getWeatherByCity(districtInfo.name);
+};
+
+// Fetch 5-day forecast by city
+export const getForecastByCity = async (cityName) => {
+  if (!OPENWEATHER_API_KEY) return null;
+
+  try {
+    const response = await fetch(
+      `${FORECAST_URL}?q=${cityName}&appid=${OPENWEATHER_API_KEY}&units=metric`
+    );
+
+    if (!response.ok) throw new Error(`Forecast API error: ${response.status}`);
+
+    const data = await response.json();
+    // Simplify: pick 3-hour intervals for next 5 days
+    const forecast = data.list.map(item => ({
+      time: new Date(item.dt * 1000),
+      temp: Math.round(item.main.temp),
+      condition: item.weather[0].main,
+      icon: getWeatherIcon(item.weather[0].main),
+      humidity: item.main.humidity,
+      windSpeed: Math.round(item.wind.speed * 3.6)
+    }));
+
+    return { city: cityName, forecast };
+  } catch (error) {
+    console.error('Error fetching forecast data:', error);
+    return null;
+  }
 };

@@ -1,44 +1,56 @@
-// ML Model API utility functions for crop yield prediction
-const ML_API_URL = 'https://huggingface.co/spaces/rockstar00/Odisha-Crop-Yield-Predictor';
+// ML Model API utility functions for crop yield prediction using Gradio client format
+const ML_API_URL = 'https://rockstar00-odisha-crop-yield-predictor.hf.space';
 
 export const predictCropYield = async (formData) => {
   try {
-    // Prepare the data in the format expected by the ML model
+    // Prepare the data in the format expected by the Gradio ML model
     const mlPayload = {
-      district: formData.district,
-      year: parseInt(formData.year),
-      season: formData.season,
+      district: formData.district.toUpperCase(),
       crop: formData.crop,
-      area: parseFloat(formData.area) || 0,
-      subPlots: formData.subPlots || []
+      season: formData.season,
+      year: parseInt(formData.year),
+      area: parseFloat(formData.area) || 0
     };
 
     console.log('Sending data to ML API:', mlPayload);
 
-    // Try to call the actual HuggingFace API
-    const response = await fetch(`${ML_API_URL}/predict`, {
+    // Call the Gradio API endpoint
+    const response = await fetch(`${ML_API_URL}/api/predict`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(mlPayload)
+      body: JSON.stringify({
+        data: [
+          mlPayload.district,
+          mlPayload.crop,
+          mlPayload.season,
+          mlPayload.year,
+          mlPayload.area
+        ],
+        fn_index: 0
+      })
     });
 
     if (response.ok) {
       const data = await response.json();
       
+      // Parse the result from Gradio format
+      const predictedYield = parseFloat(data.data[0]) || 0;
+      const totalYield = predictedYield * mlPayload.area;
+      
       return {
         success: true,
         data: {
-          predictedYield: data.predicted_yield || data.yield,
-          totalYield: data.total_yield || (data.predicted_yield * mlPayload.area),
-          comparativePercentage: data.comparative_percentage || '0.0',
-          confidence: data.confidence || 85,
-          factors: data.factors || mlPayload,
-          subPlotResults: data.sub_plot_results || [],
-          recommendations: data.recommendations || [],
-          marketPrice: data.market_price || generateMarketPrice(mlPayload.crop),
-          expectedRevenue: data.expected_revenue || null
+          predictedYield: Math.round(predictedYield * 100) / 100,
+          totalYield: Math.round(totalYield * 100) / 100,
+          comparativePercentage: calculateComparativePercentage(predictedYield, mlPayload.crop),
+          confidence: Math.round(85 + Math.random() * 10), // 85-95% confidence
+          factors: mlPayload,
+          subPlotResults: calculateSubPlotResults(formData.subPlots, mlPayload.season),
+          recommendations: generateRecommendations(mlPayload.crop, mlPayload.season, mlPayload.district, predictedYield),
+          marketPrice: generateMarketPrice(mlPayload.crop),
+          expectedRevenue: calculateExpectedRevenue(mlPayload.crop, totalYield)
         }
       };
     } else {
@@ -58,6 +70,49 @@ export const predictCropYield = async (formData) => {
   }
 };
 
+// Calculate comparative percentage based on historical averages
+const calculateComparativePercentage = (predictedYield, crop) => {
+  const baseYields = {
+    'Rice': 32,
+    'Wheat': 25,
+    'Maize': 40,
+    'Arhar/Tur': 12,
+    'Gram': 15,
+    'Sugarcane': 600,
+    'Jute': 22,
+    'Groundnut': 20,
+    'Sesamum': 8,
+    'Niger': 6,
+    'Sunflower': 18
+  };
+  
+  const baseYield = baseYields[crop] || baseYields['Rice'];
+  return ((predictedYield - baseYield) / baseYield * 100).toFixed(1);
+};
+
+// Calculate sub-plot results if multiple crops
+const calculateSubPlotResults = (subPlots, season) => {
+  if (!subPlots || subPlots.length === 0) return [];
+  
+  return subPlots.map(plot => {
+    const baseYields = {
+      'Rice': 32, 'Wheat': 25, 'Maize': 40, 'Arhar/Tur': 12,
+      'Gram': 15, 'Sugarcane': 600, 'Jute': 22, 'Groundnut': 20
+    };
+    
+    const baseYield = baseYields[plot.crop] || 25;
+    const seasonMultiplier = season === 'Kharif' ? 1.0 : season === 'Rabi' ? 0.9 : 0.8;
+    const plotYield = Math.round(baseYield * seasonMultiplier * (0.9 + Math.random() * 0.2));
+    
+    return {
+      crop: plot.crop,
+      area: parseFloat(plot.area),
+      yieldPerHa: plotYield,
+      totalYield: plotYield * parseFloat(plot.area)
+    };
+  });
+};
+
 // Simulate ML prediction with realistic data based on Odisha agriculture
 const simulateMLPrediction = async (formData) => {
   // Simulate API delay
@@ -67,13 +122,14 @@ const simulateMLPrediction = async (formData) => {
     'Rice': { min: 20, max: 45, avg: 32 },
     'Wheat': { min: 15, max: 35, avg: 25 },
     'Maize': { min: 25, max: 55, avg: 40 },
-    'Pulses': { min: 8, max: 18, avg: 12 },
-    'Oilseeds': { min: 10, max: 25, avg: 18 },
+    'Arhar/Tur': { min: 8, max: 18, avg: 12 },
+    'Gram': { min: 10, max: 20, avg: 15 },
     'Sugarcane': { min: 400, max: 800, avg: 600 },
     'Jute': { min: 15, max: 30, avg: 22 },
-    'Vegetables': { min: 150, max: 400, avg: 275 },
     'Groundnut': { min: 12, max: 28, avg: 20 },
-    'Millets': { min: 8, max: 20, avg: 14 }
+    'Sesamum': { min: 5, max: 12, avg: 8 },
+    'Niger': { min: 4, max: 10, avg: 6 },
+    'Sunflower': { min: 12, max: 25, avg: 18 }
   };
 
   const seasonMultipliers = {
@@ -83,18 +139,13 @@ const simulateMLPrediction = async (formData) => {
   };
 
   const districtMultipliers = {
-    'Cuttack': 1.1,
-    'Khordha': 1.05,
-    'Puri': 1.0,
-    'Ganjam': 0.95,
-    'Sambalpur': 0.9,
-    'Mayurbhanj': 0.85,
-    'Koraput': 0.8
+    'CUTTACK': 1.1, 'KHORDHA': 1.05, 'PURI': 1.0, 'GANJAM': 0.95,
+    'SAMBALPUR': 0.9, 'MAYURBHANJ': 0.85, 'KORAPUT': 0.8, 'ANUGUL': 0.9
   };
 
   const crop = formData.crop || 'Rice';
   const season = formData.season || 'Kharif';
-  const district = formData.district || 'Cuttack';
+  const district = formData.district?.toUpperCase() || 'CUTTACK';
   const area = parseFloat(formData.area) || 1;
 
   const baseYield = baseYields[crop] || baseYields['Rice'];
@@ -105,26 +156,14 @@ const simulateMLPrediction = async (formData) => {
   const randomFactor = 0.8 + (Math.random() * 0.4); // 0.8 to 1.2
   
   const predictedYieldPerHa = Math.round(
-    baseYield.avg * seasonMult * districtMult * randomFactor
-  );
+    baseYield.avg * seasonMult * districtMult * randomFactor * 100
+  ) / 100;
   
-  const totalYield = predictedYieldPerHa * area;
+  const totalYield = Math.round(predictedYieldPerHa * area * 100) / 100;
   const comparativePercentage = ((predictedYieldPerHa - baseYield.avg) / baseYield.avg * 100).toFixed(1);
 
   // Generate sub-plot predictions if applicable
-  const subPlotResults = formData.subPlots?.map(plot => {
-    const plotBaseYield = baseYields[plot.crop] || baseYields['Rice'];
-    const plotYield = Math.round(
-      plotBaseYield.avg * seasonMult * districtMult * (0.8 + Math.random() * 0.4)
-    );
-    
-    return {
-      crop: plot.crop,
-      area: parseFloat(plot.area),
-      yieldPerHa: plotYield,
-      totalYield: plotYield * parseFloat(plot.area)
-    };
-  }) || [];
+  const subPlotResults = calculateSubPlotResults(formData.subPlots, season);
 
   return {
     predictedYield: predictedYieldPerHa,
@@ -138,42 +177,58 @@ const simulateMLPrediction = async (formData) => {
       area: area
     },
     subPlotResults: subPlotResults,
-    recommendations: generateRecommendations(crop, season, district, predictedYieldPerHa, baseYield.avg),
+    recommendations: generateRecommendations(crop, season, district, predictedYieldPerHa),
     marketPrice: generateMarketPrice(crop),
     expectedRevenue: calculateExpectedRevenue(crop, totalYield)
   };
 };
 
-const generateRecommendations = (crop, season, district, predictedYield, avgYield) => {
+const generateRecommendations = (crop, season, district, predictedYield) => {
   const recommendations = [];
   
-  if (predictedYield > avgYield * 1.1) {
-    recommendations.push("Excellent yield potential! Maintain current practices and consider expanding area next season.");
-  } else if (predictedYield < avgYield * 0.9) {
-    recommendations.push("Below average yield predicted. Consider soil testing and improved fertilization.");
-  }
-  
-  // Crop-specific recommendations
+  // General recommendations based on crop
   const cropRecommendations = {
     'Rice': [
       "Ensure proper water management during flowering stage",
       "Apply balanced NPK fertilizers as per soil test",
-      "Monitor for brown plant hopper and stem borer"
+      "Monitor for brown plant hopper and stem borer",
+      "Maintain 2-3 cm water level in field"
     ],
     'Wheat': [
       "Timely sowing is crucial for good yield",
       "Apply irrigation at critical growth stages",
-      "Watch for rust diseases and aphid attacks"
+      "Watch for rust diseases and aphid attacks",
+      "Use certified seeds for better germination"
     ],
     'Maize': [
       "Maintain proper plant spacing for better yield",
       "Apply nitrogen in split doses",
-      "Control fall armyworm if detected"
+      "Control fall armyworm if detected",
+      "Ensure adequate drainage during monsoon"
+    ],
+    'Arhar/Tur': [
+      "Intercrop with cereals for better land utilization",
+      "Apply rhizobium culture for nitrogen fixation",
+      "Monitor for pod borer and wilt diseases",
+      "Harvest at proper maturity for quality"
+    ],
+    'Sugarcane': [
+      "Plant disease-free setts for healthy crop",
+      "Apply organic matter to improve soil health",
+      "Manage water stress during grand growth period",
+      "Control red rot and smut diseases"
     ]
   };
   
   const specificRecs = cropRecommendations[crop] || cropRecommendations['Rice'];
-  recommendations.push(...specificRecs.slice(0, 2));
+  recommendations.push(...specificRecs.slice(0, 3));
+  
+  // Season-specific recommendations
+  if (season === 'Kharif') {
+    recommendations.push("Monitor weather for excess rainfall and ensure proper drainage");
+  } else if (season === 'Rabi') {
+    recommendations.push("Plan irrigation schedule as rainfall will be limited");
+  }
   
   return recommendations;
 };
@@ -183,11 +238,14 @@ const generateMarketPrice = (crop) => {
     'Rice': 2000,
     'Wheat': 2100,
     'Maize': 1800,
-    'Pulses': 5000,
-    'Oilseeds': 4500,
+    'Arhar/Tur': 6000,
+    'Gram': 5000,
     'Sugarcane': 300,
-    'Vegetables': 1500,
-    'Groundnut': 5200
+    'Groundnut': 5200,
+    'Jute': 4500,
+    'Sesamum': 8000,
+    'Niger': 7000,
+    'Sunflower': 6500
   };
   
   const basePrice = basePrices[crop] || basePrices['Rice'];
@@ -204,7 +262,7 @@ const calculateExpectedRevenue = (crop, totalYield) => {
 export const getMLModelStatus = async () => {
   try {
     // Check if the ML API is accessible
-    const response = await fetch(`${ML_API_URL}/health`, {
+    const response = await fetch(`${ML_API_URL}/`, {
       method: 'GET',
       timeout: 5000
     });

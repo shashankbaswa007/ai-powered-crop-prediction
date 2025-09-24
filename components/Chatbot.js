@@ -78,7 +78,8 @@ const Chatbot = () => {
     const context = {
       language: language,
       userId: userId,
-      district: 'Cuttack' // Default district, can be made dynamic
+      district: 'Cuttack', // Default district, can be made dynamic
+      timestamp: new Date().toISOString()
     };
 
     // Add weather context if available
@@ -95,10 +96,26 @@ const Chatbot = () => {
   };
 
   const quickQuestions = [
-    language === 'en' ? "Best time to plant rice?" : language === 'hi' ? "चावल लगाने का सबसे अच्छा समय?" : "ଚାଉଳ ଲଗାଇବାର ସର୍ବୋତ୍ତମ ସମୟ?",
-    language === 'en' ? "How to control pests?" : language === 'hi' ? "कीटों को कैसे नियंत्रित करें?" : "କୀଟପତଙ୍ଗକୁ କିପରି ନିୟନ୍ତ୍ରଣ କରିବେ?",
-    language === 'en' ? "Soil preparation tips" : language === 'hi' ? "मिट्टी तैयार करने के टिप्स" : "ମାଟି ପ୍ରସ୍ତୁତି ଟିପ୍ସ",
-    language === 'en' ? "Water management advice" : language === 'hi' ? "जल प्रबंधन सलाह" : "ଜଳ ପରିଚାଳନା ପରାମର୍ଶ"
+    {
+      en: "Best time to plant rice?",
+      hi: "चावल लगाने का सबसे अच्छा समय?",
+      or: "ଚାଉଳ ଲଗାଇବାର ସର୍ବୋତ୍ତମ ସମୟ?"
+    },
+    {
+      en: "How to control pests?",
+      hi: "कीटों को कैसे नियंत्रित करें?",
+      or: "କୀଟପତଙ୍ଗକୁ କିପରି ନିୟନ୍ତ୍ରଣ କରିବେ?"
+    },
+    {
+      en: "Soil preparation tips",
+      hi: "मिट्टी तैयार करने के टिप्स",
+      or: "ମାଟି ପ୍ରସ୍ତୁତି ଟିପ୍ସ"
+    },
+    {
+      en: "Water management advice",
+      hi: "जल प्रबंधन सलाह",
+      or: "ଜଳ ପରିଚାଳନା ପରାମର୍ଶ"
+    }
   ];
 
   return (
@@ -165,10 +182,10 @@ const Chatbot = () => {
               {quickQuestions.map((question, index) => (
                 <button
                   key={index}
-                  onClick={() => setInputMessage(question)}
+                  onClick={() => setInputMessage(question[language] || question.en)}
                   className="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                 >
-                  {question}
+                  {question[language] || question.en}
                 </button>
               ))}
             </div>
@@ -180,7 +197,11 @@ const Chatbot = () => {
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Type your farming question..."
+                placeholder={
+                  language === 'en' ? "Type your farming question..." :
+                  language === 'hi' ? "अपना कृषि प्रश्न टाइप करें..." :
+                  "ଆପଣଙ୍କର କୃଷି ପ୍ରଶ୍ନ ଟାଇପ୍ କରନ୍ତୁ..."
+                }
                 className="flex-1 p-3 rounded-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               <button

@@ -39,8 +39,33 @@ export const AppProvider = ({ children }) => {
     return newFarm;
   };
 
+  const updateFarm = (farmId, updatedData) => {
+    setUserFarms(prev => prev.map(farm => 
+      farm.id === farmId ? { ...farm, ...updatedData } : farm
+    ));
+  };
+
+  const deleteFarm = (farmId) => {
+    setUserFarms(prev => prev.filter(farm => farm.id !== farmId));
+  };
+
   const savePrediction = (predictionData) => {
     console.log('📊 Prediction saved:', predictionData);
+    
+    // Auto-create farm from prediction if it doesn't exist
+    if (predictionData && !userFarms.some(farm => 
+      farm.district === predictionData.district && 
+      farm.crop === predictionData.crop
+    )) {
+      addNewFarm({
+        district: predictionData.district,
+        crop: predictionData.crop,
+        season: predictionData.season,
+        area: predictionData.area,
+        lastPrediction: predictionData
+      });
+    }
+    
     return 'prediction-' + Date.now();
   };
 
@@ -54,6 +79,8 @@ export const AppProvider = ({ children }) => {
     userId, 
     userFarms,
     addNewFarm,
+    updateFarm,
+    deleteFarm,
     savePrediction
   };
 

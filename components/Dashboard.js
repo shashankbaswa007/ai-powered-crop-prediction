@@ -68,7 +68,7 @@ const Dashboard = () => {
   }, [language, userFarms]); // Add userFarms dependency
 
   const generateAISuggestions = async (weatherData, farmData) => {
-    if (!weatherData?.current || !farmData) {
+    if (!weatherData?.current) {
       return language === 'en' 
         ? "Monitor soil moisture levels and check for pest infestations. Ideal time for light fertilization."
         : language === 'hi'
@@ -77,9 +77,14 @@ const Dashboard = () => {
     }
 
     try {
-      const cropInfo = {
-        district: farmData.district,
-        crop: farmData.subPlots?.[0]?.crop || 'Rice'
+      const cropInfo = farmData ? {
+        district: farmData.district || 'Cuttack',
+        crop: farmData.subPlots?.[0]?.crop || 'Rice',
+        language: language
+      } : {
+        district: 'Cuttack',
+        crop: 'Rice',
+        language: language
       };
       
       const aiAdvice = await getWeatherBasedAdvice(weatherData.current, cropInfo);
@@ -223,7 +228,7 @@ const Dashboard = () => {
                 <Card key={farm.id} title={`${t.farm} ${index + 1}`} className={theme === 'dark' ? 'bg-dark-700' : 'bg-gradient-to-br from-purple-50 to-pink-50'}>
                   <div className="space-y-2 text-sm">
                     <p><strong>{t.district}:</strong> {farm.district}</p>
-                    <p><strong>{t.area}:</strong> {farm.totalArea} hectares</p>
+                    <p><strong>{t.area}:</strong> {farm.area || farm.totalArea} hectares</p>
                     <p><strong>{t.crop}:</strong> {farm.subPlots?.map(p => p.crop).join(', ')}</p>
                   </div>
                 </Card>

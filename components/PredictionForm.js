@@ -55,6 +55,19 @@ const PredictionForm = () => {
     setPredictionResult(null);
 
     try {
+      // Validate form data
+      if (!formData.district || !formData.season) {
+        throw new Error('Please fill in all required fields');
+      }
+      
+      if (!showSubPlots && (!formData.crop || !formData.area)) {
+        throw new Error('Please select crop and enter area');
+      }
+      
+      if (showSubPlots && formData.subPlots.some(plot => !plot.crop || !plot.area)) {
+        throw new Error('Please fill in all sub-plot details');
+      }
+
       // Call ML API for prediction
       const mlResult = await predictCropYield(formData);
       
@@ -66,7 +79,8 @@ const PredictionForm = () => {
         // Get AI-powered advice
         const aiAdvice = await getCropAdvice({
           ...formData,
-          area: totalArea
+          area: totalArea,
+          language: language
         });
 
         setPredictionResult({
@@ -79,9 +93,7 @@ const PredictionForm = () => {
           expectedRevenue: mlResult.data.expectedRevenue,
           recommendations: mlResult.data.recommendations,
           advice: {
-            en: aiAdvice.success ? aiAdvice.message : `Based on your ${totalArea} hectares in ${formData.district}, the predicted yield looks good. Consider using certified seeds, maintain proper irrigation schedules, and apply balanced fertilizers.`,
-            hi: aiAdvice.success ? aiAdvice.message : `आपके ${formData.district} में ${totalArea} हेक्टेयर के लिए, अनुमानित उपज अच्छी दिख रही है। प्रमाणित बीजों का उपयोग करें, उचित सिंचाई कार्यक्रम बनाए रखें।`,
-            or: aiAdvice.success ? aiAdvice.message : `ଆପଣଙ୍କ ${formData.district} ରେ ${totalArea} ହେକ୍ଟର ପାଇଁ, ଅନୁମାନିତ ଉତ୍ପାଦନ ଭଲ ଦେଖାଯାଉଛି। ପ୍ରମାଣିତ ମଞ୍ଜି ବ୍ୟବହାର କରନ୍ତୁ।`,
+            [language]: aiAdvice.success ? aiAdvice.message : getDefaultAdvice(formData, totalArea, language)
           },
           subPlotResults: mlResult.data.subPlotResults || []
         });
@@ -90,14 +102,22 @@ const PredictionForm = () => {
       }
     } catch (error) {
       console.error('Prediction error:', error);
-      // Show error message to user
       setPredictionResult({
         error: true,
-        message: 'Unable to get prediction at the moment. Please try again later.'
+        message: error.message || 'Unable to get prediction at the moment. Please try again later.'
       });
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getDefaultAdvice = (formData, totalArea, language) => {
+    const advice = {
+      en: `Based on your ${totalArea} hectares in ${formData.district}, the predicted yield looks promising. Consider using certified seeds, maintain proper irrigation schedules, and apply balanced fertilizers based on soil test results.`,
+      hi: `आपके ${formData.district} में ${totalArea} हेक्टेयर के लिए, अनुमानित उपज आशाजनक दिख रही है। प्रमाणित बीजों का उपयोग करें, उचित सिंचाई कार्यक्रम बनाए रखें, और मिट्टी परीक्षण के आधार पर संतुलित उर्वरक लगाएं।`,
+      or: `ଆପଣଙ୍କ ${formData.district} ରେ ${totalArea} ହେକ୍ଟର ପାଇଁ, ଅନୁମାନିତ ଉତ୍ପାଦନ ଆଶାବାଦୀ ଦେଖାଯାଉଛି। ପ୍ରମାଣିତ ମଞ୍ଜି ବ୍ୟବହାର କରନ୍ତୁ, ଉପଯୁକ୍ତ ଜଳସେଚନ କାର୍ଯ୍ୟସୂଚୀ ବଜାୟ ରଖନ୍ତୁ, ଏବଂ ମାଟି ପରୀକ୍ଷା ଆଧାରରେ ସନ୍ତୁଳିତ ସାର ପ୍ରୟୋଗ କରନ୍ତୁ।`
+    };
+    return advice[language] || advice.en;
   };
 
   const isFormValid = formData.district && formData.season && 
@@ -211,6 +231,12 @@ const PredictionForm = () => {
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                     <span>Analyzing with AI...</span>
+                    <button 
+                      onClick={() => setPredictionResult(null)}
+                      className="mt-3 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      Try Again
+                    </button>
                   </>
                 ) : (
                   <>
@@ -293,7 +319,7 @@ const PredictionForm = () => {
                   {!predictionResult.error && (
                     <>
                       <div className="text-sm leading-relaxed mb-4">
-                        {predictionResult.advice[language] || predictionResult.advice.en}
+                        {predictionResult.advice[language]}
                       </div>
                       
                       {predictionResult.recommendations && predictionResult.recommendations.length > 0 && (

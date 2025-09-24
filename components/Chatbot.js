@@ -7,7 +7,6 @@ import { getWeatherByDistrict } from '../utils/weatherApi';
 const Chatbot = () => {
   const { theme, language, userId } = useAppContext();
   const t = i18n[language];
-
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -20,19 +19,14 @@ const Chatbot = () => {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+
+  useEffect(() => scrollToBottom(), [messages]);
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
-    const userMessage = {
-      id: messages.length + 1,
-      text: inputMessage,
-      sender: 'user',
-      timestamp: new Date()
-    };
+    const userMessage = { id: messages.length + 1, text: inputMessage, sender: 'user', timestamp: new Date() };
     setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     setIsTyping(true);
@@ -48,7 +42,6 @@ const Chatbot = () => {
         timestamp: new Date(),
         error: !aiResponse.success
       };
-
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
       console.error('Chatbot error:', error);
@@ -91,27 +84,26 @@ const Chatbot = () => {
         <p className="text-lg text-center mb-8 opacity-75">Get instant farming advice from AI</p>
 
         <div className={`rounded-2xl shadow-xl h-[600px] flex flex-col ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}>
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-t-2xl">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center"><span className="text-2xl">🤖</span></div>
-              <div>
-                <h3 className="font-bold">Smart Farmer AI</h3>
-                <p className="text-sm opacity-90">Online • Ready to help</p>
-              </div>
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-t-2xl flex items-center space-x-3">
+            <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center">
+              <span className="text-2xl">🤖</span>
+            </div>
+            <div>
+              <h3 className="font-bold">Smart Farmer AI</h3>
+              <p className="text-sm opacity-90">Online • Ready to help</p>
             </div>
           </div>
 
           <div className="flex-1 p-4 overflow-y-auto">
-            {messages.map(msg => (
-              <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+            {messages.map(m => (
+              <div key={m.id} className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
                 <div className={`max-w-xs lg:max-w-md rounded-2xl p-4 ${
-                  msg.sender === 'user' 
-                    ? 'bg-blue-500 text-white rounded-br-none' 
-                    : `${msg.error ? 'bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700' : 'bg-gray-100 dark:bg-gray-700'} text-gray-800 dark:text-gray-200 rounded-bl-none`
+                  m.sender === 'user' ? 'bg-blue-500 text-white rounded-br-none' :
+                  `${m.error ? 'bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700' : 'bg-gray-100 dark:bg-gray-700'} text-gray-800 dark:text-gray-200 rounded-bl-none`
                 }`}>
-                  <p className="text-sm">{msg.text}</p>
-                  <p className="text-xs opacity-70 mt-1">{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                  {msg.error && <p className="text-xs text-red-600 dark:text-red-400 mt-1">⚠️ Error occurred</p>}
+                  <p className="text-sm">{m.text}</p>
+                  <p className="text-xs opacity-70 mt-1">{m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  {m.error && <p className="text-xs text-red-600 dark:text-red-400 mt-1">⚠️ Error occurred</p>}
                 </div>
               </div>
             ))}
@@ -119,8 +111,8 @@ const Chatbot = () => {
               <div className="flex justify-start mb-4">
                 <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl rounded-bl-none p-4 flex space-x-1">
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0.2s'}}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay:'0.4s'}}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-400"></div>
                 </div>
               </div>
             )}
@@ -129,14 +121,13 @@ const Chatbot = () => {
 
           <div className="p-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex flex-wrap gap-2 mb-3">
-              {quickQuestions.map((q,i) => (
+              {quickQuestions.map((q, i) => (
                 <button key={i} onClick={() => setInputMessage(q[language] || q.en)}
                   className="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
                   {q[language] || q.en}
                 </button>
               ))}
             </div>
-
             <div className="flex space-x-2">
               <input
                 type="text"
@@ -144,8 +135,8 @@ const Chatbot = () => {
                 onChange={e => setInputMessage(e.target.value)}
                 onKeyPress={e => e.key === 'Enter' && handleSendMessage()}
                 placeholder={language === 'en' ? "Type your farming question..." :
-                            language === 'hi' ? "अपना कृषि प्रश्न टाइप करें..." :
-                            "ଆପଣଙ୍କର କୃଷି ପ୍ରଶ୍ନ ଟାଇପ୍ କରନ୍ତୁ..."}
+                             language === 'hi' ? "अपना कृषि प्रश्न टाइप करें..." :
+                             "ଆପଣଙ୍କର କୃଷି ପ୍ରଶ୍ନ ଟାଇପ୍ କରନ୍ତୁ..."}
                 className="flex-1 p-3 rounded-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               <button onClick={handleSendMessage} disabled={!inputMessage.trim()}

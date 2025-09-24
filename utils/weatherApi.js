@@ -1,8 +1,56 @@
 // utils/weatherApi.js
+// Weather API utility functions using OpenWeather One Call 2.5 (free)
 const OPENWEATHER_API_KEY = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
 const OPENWEATHER_ONECALL_URL = 'https://api.openweathermap.org/data/2.5/onecall';
 const OPENWEATHER_GEOCODING_URL = 'https://api.openweathermap.org/geo/1.0/direct';
 
+// Map of Odisha districts to representative city coordinates
+export const districtCityMap = {
+  Angul: { name: 'Angul', lat: 20.8397, lon: 85.1016 },
+  Balangir: { name: 'Balangir', lat: 20.7081, lon: 83.4847 },
+  Bhadrak: { name: 'Bhadrak', lat: 21.0542, lon: 86.5158 },
+  Boudh: { name: 'Boudh', lat: 20.8356, lon: 84.3258 },
+  Cuttack: { name: 'Cuttack', lat: 20.4625, lon: 85.8828 },
+  Dhenkanal: { name: 'Dhenkanal', lat: 20.6586, lon: 85.5947 },
+  Gajapati: { name: 'Paralakhemundi', lat: 18.7833, lon: 84.0833 },
+  Ganjam: { name: 'Berhampur', lat: 19.3149, lon: 84.7941 },
+  Jagatsinghpur: { name: 'Jagatsinghpur', lat: 20.2518, lon: 86.1739 },
+  Jajpur: { name: 'Jajpur', lat: 20.8397, lon: 86.3269 },
+  Jharsuguda: { name: 'Jharsuguda', lat: 21.8558, lon: 84.0058 },
+  Kalahandi: { name: 'Bhawanipatna', lat: 19.9069, lon: 83.1636 },
+  Kandhamal: { name: 'Phulbani', lat: 20.4781, lon: 84.2353 },
+  Kendrapara: { name: 'Kendrapara', lat: 20.5000, lon: 86.4219 },
+  Keonjhar: { name: 'Keonjhar', lat: 21.6297, lon: 85.5828 },
+  Khordha: { name: 'Bhubaneswar', lat: 20.2961, lon: 85.8245 },
+  Koraput: { name: 'Koraput', lat: 18.8120, lon: 82.7108 },
+  Malkangiri: { name: 'Malkangiri', lat: 18.3478, lon: 81.8811 },
+  Mayurbhanj: { name: 'Baripada', lat: 21.9347, lon: 86.7339 },
+  Nabarangpur: { name: 'Nabarangpur', lat: 19.2306, lon: 82.5497 },
+  Nayagarh: { name: 'Nayagarh', lat: 20.1297, lon: 85.0958 },
+  Nuapada: { name: 'Nuapada', lat: 20.8047, lon: 82.6197 },
+  Puri: { name: 'Puri', lat: 19.8135, lon: 85.8312 },
+  Rayagada: { name: 'Rayagada', lat: 19.1697, lon: 83.4158 },
+  Sambalpur: { name: 'Sambalpur', lat: 21.4669, lon: 83.9812 },
+  Subarnapur: { name: 'Subarnapur', lat: 20.3269, lon: 83.9019 },
+  Sundargarh: { name: 'Rourkela', lat: 22.2604, lon: 84.8536 }
+};
+
+const getWeatherIcon = (condition) => {
+  const iconMap = {
+    Clear: '☀️',
+    Clouds: '☁️',
+    Rain: '🌧️',
+    Drizzle: '🌦️',
+    Thunderstorm: '⛈️',
+    Snow: '❄️',
+    Mist: '🌫️',
+    Fog: '🌫️',
+    Haze: '🌫️'
+  };
+  return iconMap[condition] || '🌤️';
+};
+
+// Get weather by coordinates
 export const getWeatherByCoordinates = async (lat, lon) => {
   if (!OPENWEATHER_API_KEY) {
     console.warn('OpenWeather API key not found');
@@ -24,12 +72,12 @@ export const getWeatherByCoordinates = async (lat, lon) => {
       current: {
         temperature: Math.round(data.current.temp),
         humidity: data.current.humidity,
-        wind: Math.round(data.current.wind_speed * 3.6), // Convert m/s to km/h
+        wind: Math.round(data.current.wind_speed * 3.6),
         condition: data.current.weather[0].main,
         description: data.current.weather[0].description,
         icon: getWeatherIcon(data.current.weather[0].main),
         pressure: data.current.pressure,
-        visibility: data.current.visibility / 1000, // km
+        visibility: data.current.visibility / 1000,
         uvIndex: data.current.uvi
       },
       hourly: data.hourly.slice(0, 24).map(hour => ({
@@ -49,7 +97,7 @@ export const getWeatherByCoordinates = async (lat, lon) => {
         icon: getWeatherIcon(day.weather[0].main),
         humidity: day.humidity,
         windSpeed: Math.round(day.wind_speed * 3.6),
-        pop: Math.round(day.pop * 100) // Probability of precipitation
+        pop: Math.round(day.pop * 100)
       }))
     };
   } catch (error) {
@@ -58,6 +106,7 @@ export const getWeatherByCoordinates = async (lat, lon) => {
   }
 };
 
+// Get weather by city name
 export const getWeatherByCity = async (cityName) => {
   if (!OPENWEATHER_API_KEY) {
     console.warn('OpenWeather API key not found');
@@ -94,55 +143,7 @@ export const getWeatherByCity = async (cityName) => {
   }
 };
 
-const getWeatherIcon = (condition) => {
-  const iconMap = {
-    'Clear': '☀️',
-    'Clouds': '☁️',
-    'Rain': '🌧️',
-    'Drizzle': '🌦️',
-    'Thunderstorm': '⛈️',
-    'Snow': '❄️',
-    'Mist': '🌫️',
-    'Fog': '🌫️',
-    'Haze': '🌫️'
-  };
-  return iconMap[condition] || '🌤️';
-};
-
-// Full Odisha district map with coordinates
-export const districtCityMap = {
-  'Angul': { name: 'Angul', lat: 20.8397, lon: 85.1016 },
-  'Balangir': { name: 'Balangir', lat: 20.7081, lon: 83.4847 },
-  'Balasore': { name: 'Balasore', lat: 21.4906, lon: 86.9310 },
-  'Bargarh': { name: 'Bargarh', lat: 21.3333, lon: 83.6167 },
-  'Bhadrak': { name: 'Bhadrak', lat: 21.0542, lon: 86.5158 },
-  'Boudh': { name: 'Boudh', lat: 20.8356, lon: 84.3258 },
-  'Cuttack': { name: 'Cuttack', lat: 20.4625, lon: 85.8828 },
-  'Deogarh': { name: 'Deogarh', lat: 21.4911, lon: 84.4305 },
-  'Dhenkanal': { name: 'Dhenkanal', lat: 20.6586, lon: 85.5947 },
-  'Gajapati': { name: 'Paralakhemundi', lat: 18.7833, lon: 84.0833 },
-  'Ganjam': { name: 'Berhampur', lat: 19.3149, lon: 84.7941 },
-  'Jagatsinghpur': { name: 'Jagatsinghpur', lat: 20.2518, lon: 86.1739 },
-  'Jajpur': { name: 'Jajpur', lat: 20.8397, lon: 86.3269 },
-  'Jharsuguda': { name: 'Jharsuguda', lat: 21.8558, lon: 84.0058 },
-  'Kalahandi': { name: 'Bhawanipatna', lat: 19.9069, lon: 83.1636 },
-  'Kandhamal': { name: 'Phulbani', lat: 20.4781, lon: 84.2353 },
-  'Kendrapara': { name: 'Kendrapara', lat: 20.5000, lon: 86.4219 },
-  'Keonjhar': { name: 'Keonjhar', lat: 21.6297, lon: 85.5828 },
-  'Khordha': { name: 'Bhubaneswar', lat: 20.2961, lon: 85.8245 },
-  'Koraput': { name: 'Koraput', lat: 18.8120, lon: 82.7108 },
-  'Malkangiri': { name: 'Malkangiri', lat: 18.3478, lon: 81.8811 },
-  'Mayurbhanj': { name: 'Baripada', lat: 21.9347, lon: 86.7339 },
-  'Nabarangpur': { name: 'Nabarangpur', lat: 19.2306, lon: 82.5497 },
-  'Nayagarh': { name: 'Nayagarh', lat: 20.1297, lon: 85.0958 },
-  'Nuapada': { name: 'Nuapada', lat: 20.8047, lon: 82.6197 },
-  'Puri': { name: 'Puri', lat: 19.8135, lon: 85.8312 },
-  'Rayagada': { name: 'Rayagada', lat: 19.1697, lon: 83.4158 },
-  'Sambalpur': { name: 'Sambalpur', lat: 21.4669, lon: 83.9812 },
-  'Subarnapur': { name: 'Subarnapur', lat: 20.3269, lon: 83.9019 },
-  'Sundargarh': { name: 'Rourkela', lat: 22.2604, lon: 84.8536 }
-};
-
+// Get weather by district name
 export const getWeatherByDistrict = async (district) => {
   const districtInfo = districtCityMap[district];
   if (!districtInfo) {

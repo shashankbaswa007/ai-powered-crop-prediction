@@ -4,7 +4,7 @@ import { i18n } from '../data/i18n';
 import Card from './Card';
 import ChartCard from './ChartCard';
 import { yieldData, soilData, weatherData } from '../data/mockData';
-import { getWeatherByCity, districtCityMap } from '../utils/weatherApi';
+import { getWeatherByDistrict, districtCityMap } from '../utils/weatherApi';
 import { getWeatherBasedAdvice } from '../utils/geminiApi';
 
 const Dashboard = () => {
@@ -19,11 +19,10 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       // Fetch real weather data
       const defaultDistrict = userFarms.length > 0 ? userFarms[0].district : 'Cuttack';
-      const cityName = districtCityMap[defaultDistrict] || 'Cuttack';
       
-      const weatherData = await getWeatherByCity(cityName);
+      const weatherData = await getWeatherByDistrict(defaultDistrict);
       if (weatherData) {
-        setWeather(weatherData);
+        setWeather(weatherData.current);
       } else {
         // Fallback to simulated data
         setWeather({
@@ -52,7 +51,9 @@ const Dashboard = () => {
       
       setSuggestions({
         today: await generateAISuggestions(weatherData, userFarms[0]),
-        tomorrow: language === 'en'
+        tomorrow: weatherData?.daily?.[1] ? 
+          `Tomorrow: ${weatherData.daily[1].description}, ${weatherData.daily[1].tempMax}°C/${weatherData.daily[1].tempMin}°C` :
+          language === 'en'
           ? "Prepare for possible rainfall. Ensure proper drainage and consider applying organic compost."
           : language === 'hi'
           ? "संभावित वर्षा के लिए तैयार रहें। उचित जल निकासी सुनिश्चित करें और जैविक खाद लगाने पर विचार करें।"
@@ -67,7 +68,7 @@ const Dashboard = () => {
   }, [language, userFarms]); // Add userFarms dependency
 
   const generateAISuggestions = async (weatherData, farmData) => {
-    if (!weatherData || !farmData) {
+    if (!weatherData?.current || !farmData) {
       return language === 'en' 
         ? "Monitor soil moisture levels and check for pest infestations. Ideal time for light fertilization."
         : language === 'hi'
@@ -81,7 +82,7 @@ const Dashboard = () => {
         crop: farmData.subPlots?.[0]?.crop || 'Rice'
       };
       
-      const aiAdvice = await getWeatherBasedAdvice(weatherData, cropInfo);
+      const aiAdvice = await getWeatherBasedAdvice(weatherData.current, cropInfo);
       
       if (aiAdvice.success) {
         return aiAdvice.message.substring(0, 200) + '...'; // Limit length for dashboard

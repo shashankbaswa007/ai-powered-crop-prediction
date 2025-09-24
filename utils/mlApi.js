@@ -1,5 +1,5 @@
 // ML Model API utility functions for crop yield prediction
-const ML_API_URL = process.env.NEXT_PUBLIC_ML_API_URL;
+const ML_API_URL = 'https://huggingface.co/spaces/rockstar00/Odisha-Crop-Yield-Predictor';
 
 export const predictCropYield = async (formData) => {
   try {
@@ -10,23 +10,12 @@ export const predictCropYield = async (formData) => {
       season: formData.season,
       crop: formData.crop,
       area: parseFloat(formData.area) || 0,
-      // Add any additional fields that the ML model expects
       subPlots: formData.subPlots || []
     };
 
     console.log('Sending data to ML API:', mlPayload);
 
-    // For now, we'll simulate the API call since the HuggingFace space might need specific formatting
-    // Replace this with actual API call when the endpoint format is confirmed
-    const response = await simulateMLPrediction(mlPayload);
-    
-    return {
-      success: true,
-      data: response
-    };
-
-    // Uncomment and modify this when the actual API endpoint is ready:
-    /*
+    // Try to call the actual HuggingFace API
     const response = await fetch(`${ML_API_URL}/predict`, {
       method: 'POST',
       headers: {
@@ -35,17 +24,26 @@ export const predictCropYield = async (formData) => {
       body: JSON.stringify(mlPayload)
     });
 
-    if (!response.ok) {
+    if (response.ok) {
+      const data = await response.json();
+      
+      return {
+        success: true,
+        data: {
+          predictedYield: data.predicted_yield || data.yield,
+          totalYield: data.total_yield || (data.predicted_yield * mlPayload.area),
+          comparativePercentage: data.comparative_percentage || '0.0',
+          confidence: data.confidence || 85,
+          factors: data.factors || mlPayload,
+          subPlotResults: data.sub_plot_results || [],
+          recommendations: data.recommendations || [],
+          marketPrice: data.market_price || generateMarketPrice(mlPayload.crop),
+          expectedRevenue: data.expected_revenue || null
+        }
+      };
+    } else {
       throw new Error(`ML API error: ${response.status}`);
     }
-
-    const data = await response.json();
-    
-    return {
-      success: true,
-      data: data
-    };
-    */
   } catch (error) {
     console.error('Error calling ML API:', error);
     

@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { i18n } from '../data/i18n';
-import { sendMessageToGemini } from '../utils/geminiApi';
-import { getWeatherByCity, districtCityMap } from '../utils/weatherApi';
+import { sendMessageToChatbot } from '../utils/geminiApi';
+import { getWeatherByDistrict } from '../utils/weatherApi';
 
 const Chatbot = () => {
-  const { theme, language } = useAppContext();
+  const { theme, language, userId } = useAppContext();
   const t = i18n[language];
   const [messages, setMessages] = useState([
     {
@@ -45,8 +45,8 @@ const Chatbot = () => {
       // Prepare context for better AI responses
       const context = await prepareContext();
       
-      // Send message to Gemini AI
-      const aiResponse = await sendMessageToGemini(inputMessage, context);
+      // Send message to chatbot API
+      const aiResponse = await sendMessageToChatbot(inputMessage, context);
       
       const botMessage = {
         id: messages.length + 2,
@@ -77,14 +77,15 @@ const Chatbot = () => {
   const prepareContext = async () => {
     const context = {
       language: language,
-      userId: userId
+      userId: userId,
+      district: 'Cuttack' // Default district, can be made dynamic
     };
 
     // Add weather context if available
     try {
-      const weatherData = await getWeatherByCity('Cuttack'); // Default city
-      if (weatherData) {
-        context.weather = weatherData;
+      const weatherData = await getWeatherByDistrict('Cuttack');
+      if (weatherData?.current) {
+        context.weather = weatherData.current;
       }
     } catch (error) {
       console.warn('Could not fetch weather for context:', error);

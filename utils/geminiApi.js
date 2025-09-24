@@ -1,13 +1,8 @@
-// utils/geminiApi.js
-
-// Use the local Next.js API route as proxy
-const CHATBOT_API_URL = '/api/chatbot';
+const CHATBOT_API_URL = 'https://agrigem-1.onrender.com/ask'; // correct endpoint
 
 export const sendMessageToChatbot = async (message, context = {}) => {
   try {
-    const payload = { message, context };
-
-    console.log('Sending to chatbot via proxy:', payload);
+    const payload = { question: message }; // matches /ask API
 
     const response = await fetch(CHATBOT_API_URL, {
       method: 'POST',
@@ -21,44 +16,49 @@ export const sendMessageToChatbot = async (message, context = {}) => {
 
     return {
       success: true,
-      message: data.response || data.message || 'I received your message but couldn’t generate a proper response.',
+      message: data.answer || data.response || 'I received your message but couldn\'t generate a proper response.',
       timestamp: new Date()
     };
+
   } catch (error) {
     console.error('Error calling chatbot API:', error);
 
     return {
       success: false,
-      message: "I apologize, but I'm experiencing technical difficulties. Please try again in a moment.",
+      message: "I apologize, but I'm experiencing technical difficulties. Please try again later.",
       error: error.message,
       timestamp: new Date()
     };
   }
 };
 
-// Example function to get crop-specific advice
+// Crop-specific advice via /recommend endpoint
 export const getCropAdvice = async (cropData) => {
-  const message = `I need advice for growing ${cropData.crop} in ${cropData.district} district during ${cropData.season} season on ${cropData.area} hectares. What are the best practices, potential challenges, and recommendations?`;
-  
-  const context = {
-    district: cropData.district,
-    season: cropData.season,
-    crop: cropData.crop,
-    area: cropData.area,
-    language: cropData.language || 'en'
-  };
-  
-  return await sendMessageToChatbot(message, context);
-};
+  try {
+    const payload = {
+      crop: cropData.crop,
+      area: cropData.area,
+      target_yield: cropData.target_yield || null
+    };
 
-// Example function for weather-based advice
-export const getWeatherBasedAdvice = async (weatherData, cropInfo) => {
-  const message = `Given the current weather conditions (${weatherData.condition}, ${weatherData.temperature}°C, ${weatherData.humidity}% humidity), what farming activities should I focus on for my ${cropInfo.crop} crop in ${cropInfo.district}?`;
-  
-  const context = {
-    weather: weatherData,
-    ...cropInfo
-  };
-  
-  return await sendMessageToChatbot(message, context);
+    const response = await fetch('https://agrigem-1.onrender.com/recommend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) throw new Error(`Chatbot API error: ${response.status}`);
+
+    const data = await response.json();
+    return { success: true, message: data.recommendation || '', timestamp: new Date() };
+
+  } catch (error) {
+    console.error('Error calling recommendation API:', error);
+    return {
+      success: false,
+      message: "Could not fetch crop recommendation. Please try again later.",
+      error: error.message,
+      timestamp: new Date()
+    };
+  }
 };

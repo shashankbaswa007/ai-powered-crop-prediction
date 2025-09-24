@@ -1,9 +1,9 @@
 import React from 'react';
 import { useAppContext } from '../context/AppContext';
-import Navbar from '../components/Navbar';
-import Dashboard from '../components/Dashboard';
-import PredictionForm from '../components/PredictionForm';
-import Chatbot from '../components/Chatbot';
+import { Navbar } from '../components/Navbar';               // named import
+import { Dashboard } from '../components/Dashboard';         // named import
+import { PredictionForm } from '../components/PredictionForm'; // named import
+import { Chatbot } from '../components/Chatbot';             // named import
 
 const Home = () => {
   const { theme, view } = useAppContext();

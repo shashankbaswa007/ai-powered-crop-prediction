@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { i18n } from '../data/i18n';
-import { Card } from './Card';          // fixed to named import
-import { ChartCard } from './ChartCard'; // fixed to named import
+import Card from './Card';        // default export
+import ChartCard from './ChartCard'; // default export
 import { yieldData, soilData, weatherData } from '../data/mockData';
 import { getWeatherByDistrict } from '../utils/weatherApi';
 import { getWeatherBasedAdvice } from '../utils/geminiApi';
@@ -104,4 +104,4 @@ const Dashboard = () => {
   );
 };
 
-export { Dashboard }; // changed to named export
+export default Dashboard ; // changed to named export

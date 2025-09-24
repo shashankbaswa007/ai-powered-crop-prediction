@@ -3,7 +3,6 @@
 const OPENWEATHER_API_KEY = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
 const CURRENT_WEATHER_URL = 'https://api.openweathermap.org/data/2.5/weather';
 
-// Map Odisha districts to coordinates (all districts)
 export const districtCityMap = {
   'Angul': { lat: 20.8397, lon: 85.1016 },
   'Balangir': { lat: 20.7081, lon: 83.4847 },
@@ -51,10 +50,7 @@ const getWeatherIcon = (condition) => {
 
 export const getWeatherByDistrict = async (district) => {
   const coords = districtCityMap[district];
-  if (!coords) {
-    console.warn(`District not found: ${district}`);
-    return null;
-  }
+  if (!coords) return null;
 
   if (!OPENWEATHER_API_KEY) {
     console.warn('OpenWeather API key not found');
@@ -62,30 +58,30 @@ export const getWeatherByDistrict = async (district) => {
   }
 
   try {
-    const response = await fetch(
+    const res = await fetch(
       `${CURRENT_WEATHER_URL}?lat=${coords.lat}&lon=${coords.lon}&appid=${OPENWEATHER_API_KEY}&units=metric`
     );
 
-    if (!response.ok) {
-      throw new Error(`Weather API error: ${response.status}`);
+    if (!res.ok) {
+      throw new Error(`Weather API error: ${res.status}`);
     }
 
-    const data = await response.json();
+    const data = await res.json();
 
     return {
       current: {
         temperature: Math.round(data.main.temp),
         humidity: data.main.humidity,
-        wind: Math.round(data.wind.speed * 3.6), // m/s to km/h
+        wind: Math.round(data.wind.speed * 3.6),
         condition: data.weather[0].main,
         description: data.weather[0].description,
         icon: getWeatherIcon(data.weather[0].main),
         pressure: data.main.pressure,
-        visibility: data.visibility / 1000 // km
+        visibility: data.visibility / 1000
       }
     };
-  } catch (error) {
-    console.error('Error fetching weather data:', error);
+  } catch (err) {
+    console.error('Error fetching weather data:', err);
     return null;
   }
 };
